@@ -21,9 +21,9 @@ namespace YoutubeExport
     {
         public Mainfrm()
         {
-            InitializeComponent();
             //Bitmap bmp = YoutubeExport.Properties.Resources.youtube;
             //this.Icon = Icon.FromHandle(bmp.GetHicon());
+            InitializeComponent();
         }
 
         private string GetBlockContent(ref string strSearch, string strBlockStart, string strBLockEnd, bool blnIncludeSearch = false)
