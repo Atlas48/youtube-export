@@ -16,6 +16,7 @@ using System.Text.RegularExpressions;
 
 namespace YoutubeExport
 {
+
     
     public partial class Mainfrm : Form
     {
@@ -26,13 +27,18 @@ namespace YoutubeExport
             InitializeComponent();
         }
 
+        private void Mainfrm_Load(object sender, EventArgs e)
+        {
+            txtUrl.Text = "http://www.youtube.com/playlist?list=FLGYr00JNLYnkz3agksMszxA";
+        }
+
         private string GetBlockContent(ref string strSearch, string strBlockStart, string strBLockEnd, bool blnIncludeSearch = false)
         {
             int iBlockStart = 0;
             int iBlockEnd = 0;
             string strResult = "";
 
-            try  
+            try
             {
                 iBlockStart = strSearch.IndexOf(strBlockStart);
 
@@ -72,54 +78,6 @@ namespace YoutubeExport
 
             return strResult;
 
-        }
-
-        private void Mainfrm_Load(object sender, EventArgs e)
-        {
-            txtUrl.Text = "http://www.youtube.com/playlist?list=FLGYr00JNLYnkz3agksMszxA";
-        }
-
-        private delegate void SetCtrlPropDelegate(Control control, string propertyName, object propertyValue);
-
-        public static void SetCtrlProp(Control control, string propertyName, object propertyValue)
-        {
-            if (control.InvokeRequired)
-            {
-                control.Invoke(new SetCtrlPropDelegate(SetCtrlProp), new object[] { control, propertyName, propertyValue });
-            }
-            else
-            {
-                control.GetType().InvokeMember(propertyName, BindingFlags.SetProperty, null, control, new object[] { propertyValue });
-            }
-        }
-
-        private delegate void SetCtrlPropDelegateCollection(Control control, object item, string propertyName, object propertyValue);
-
-        public static void SetCtrlPropCollection(Control control, object item, string propertyName, object propertyValue)
-        {
-            if (control.InvokeRequired)
-            {
-                control.Invoke(new SetCtrlPropDelegateCollection(SetCtrlPropCollection), new object[] { control, item, propertyName, propertyValue });
-            }
-            else
-            {
-                item.GetType().InvokeMember(propertyName, BindingFlags.SetProperty, null, item, new object[] { propertyValue });
-            }
-        }
-
-        private void cmdRefresh_Click(object sender, EventArgs e)
-        {
-            txtResults.Text = "";
-            sstrip.Items[0].Text = "";
-            cmdRefresh.Enabled = false;
-            txtUrl.Enabled = false;
-            chkSaveHtml.Enabled = false;
-            chkSaveFile.Enabled = false;
-            txtResults.Enabled = false;
-
-            Thread t = new Thread(() => GetData(txtUrl.Text));
-            t.IsBackground = true;
-            t.Start();
         }
 
         private byte[] GetImage(string url)
@@ -178,6 +136,8 @@ namespace YoutubeExport
             {
                 fileName = WebUtility.HtmlDecode(fileName);
 
+                fileName = new Regex("[\\/:*?\"'<>|]").Replace(fileName, "");
+
                 string strFilePath = AppDomain.CurrentDomain.BaseDirectory.ToString() + "\\" + fileName + ".html";
 
                 System.IO.StreamWriter file = new System.IO.StreamWriter(strFilePath, false, Encoding.UTF8);
@@ -203,7 +163,7 @@ namespace YoutubeExport
                 file.WriteLine(strHtlmDoc);
                 file.Close();
 
-                System.Diagnostics.Process.Start(strFilePath);
+                //System.Diagnostics.Process.Start(strFilePath);
             }
         }
 
@@ -212,6 +172,8 @@ namespace YoutubeExport
             if (fileName != "")
             {
                 fileName = WebUtility.HtmlDecode(fileName);
+
+                fileName = new Regex("[\\/:*?\"'<>|]").Replace(fileName, "");
 
                 string strFilePath = AppDomain.CurrentDomain.BaseDirectory.ToString() + "\\" + fileName + ".txt";
 
@@ -228,20 +190,135 @@ namespace YoutubeExport
             return Regex.Replace(HTML, Pat, "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
         }
 
-        private void GetData(string strMainURL)
+        BackgroundWorker m_oWorker;
+
+        public class YoutubePlaylist 
         {
-            string strSearchURL = "";
+            public string Url { get; set; }
+            public string Title { get; set; }
+            public string Data { get; set; }
+            
+            public YoutubePlaylist()
+            {
+            }
 
-            string strBlock = "";
-            string strListItem = "";
-            string strExtrasBlock = "";
-            string strVideoUrl = "";
-            string strTitle = "";
-            string strOwner = "";
-            string strViews = "";
+            public YoutubePlaylist(string Url)
+            {
+                this.Url = Url;
+            }
+        };
 
-            string strResults = "";
-            string strLine = "";
+        public class reportProgress
+        {
+            public string Status { get; set; }
+            public string Page { get; set; }
+
+            public reportProgress(string Status, string Page )
+            {
+                this.Status = Status;
+                this.Page = Page;
+            }
+        };
+
+        private void cmdRefresh_Click(object sender, EventArgs e)
+        {
+            tbControl.TabPages.Clear();
+            sstrip.Items[0].Text = "";
+            sstrip.Items[1].Text = "";
+            cmdRefresh.Enabled = false;
+            cmdCancel.Enabled = true;
+            txtUrl.Enabled = false;
+            chkSaveHtml.Enabled = false;
+            chkSaveFile.Enabled = false;
+            tbControl.Enabled = false;
+            this.Cursor = Cursors.WaitCursor;
+
+            m_oWorker = new BackgroundWorker();
+
+            m_oWorker.DoWork += new DoWorkEventHandler(m_oWorker_DoWork);
+            m_oWorker.ProgressChanged += new ProgressChangedEventHandler (m_oWorker_ProgressChanged);
+            m_oWorker.RunWorkerCompleted += new RunWorkerCompletedEventHandler (m_oWorker_RunWorkerCompleted);
+            m_oWorker.WorkerReportsProgress = true;
+            m_oWorker.WorkerSupportsCancellation = true;
+
+            m_oWorker.RunWorkerAsync(txtUrl.Text);
+        }
+
+        void m_oWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        {
+            if (e.Cancelled)
+            {
+                sstrip.Items[0].Text = "Cancelled.";
+            }
+
+            else if (e.Error != null)
+            {
+                sstrip.Items[0].Text = e.Error.Message;
+            }
+            else
+            {
+                List<YoutubePlaylist> ytPlaylists = (List<YoutubePlaylist>) e.Result;
+
+                //List<TextBox> txtResults = new List<TextBox>();
+
+                foreach (YoutubePlaylist ytPlaylist in ytPlaylists)
+                {
+                    TextBox txtBox;
+
+                    txtBox = new TextBox();
+                    txtBox.ScrollBars = ScrollBars.Both;
+                    txtBox.Multiline = true;
+                    txtBox.Dock = DockStyle.Fill;
+                    txtBox.WordWrap = false;
+                    txtBox.Font = new Font("Courier", 10);
+
+                    txtBox.Text = ytPlaylist.Data;
+                    //txtResults.Find(item => item.Text == strPlayListName)
+
+                    if (ytPlaylist.Title!=null && ytPlaylist.Data != null)
+                    {
+                        //txtResults.Add(txtBox);
+
+                        tbControl.TabPages.Add(ytPlaylist.Title, ytPlaylist.Title);
+                        tbControl.TabPages[ytPlaylist.Title].Controls.Add(txtBox);
+                    }
+                }
+            }
+
+            this.Cursor = Cursors.Default; 
+            cmdRefresh.Enabled= true;
+            txtUrl.Enabled=true;
+            chkSaveHtml.Enabled=true;
+            chkSaveFile.Enabled=true;
+            tbControl.Enabled=true;
+            cmdCancel.Enabled = false;
+        }
+
+        void m_oWorker_ProgressChanged(object sender, ProgressChangedEventArgs e)
+        {
+            if (e.UserState != null)
+            {
+                reportProgress rpProgress = (reportProgress)e.UserState;
+
+                sstrip.Items[0].Text = rpProgress.Status;
+                sstrip.Items[1].Text = rpProgress.Page;
+            }
+        }
+
+        private void cmdCancel_Click(object sender, EventArgs e)
+        {
+            if (m_oWorker.IsBusy)
+            {
+                m_oWorker.CancelAsync();
+            }
+        }
+
+        void m_oWorker_DoWork(object sender, DoWorkEventArgs e)
+        {
+            string strMainURL = e.Argument.ToString();
+
+            bool blnResultOk;
+
             string strdummy = "";
             string strThumbImg = "";
             string StrThumbUriSource = "";
@@ -249,147 +326,209 @@ namespace YoutubeExport
 
             StringBuilder strListItems = new StringBuilder();
 
-            bool blnResultOk;
             string result;
-            int iCounter = 0;
-            int iLineCounter = 0;
             HttpWebRequest myRequest;
             HttpWebResponse myResponse;
             StreamReader sr;
-            string resulttmp="";
-            string strPlayListName="";
+            string resulttmp = "";
+            string strPlayListName = "";
 
-            try
+            List<YoutubePlaylist> ytPlaylists = new List<YoutubePlaylist>();
+
+            CookieContainer cookies = new CookieContainer();
+
+            if (strMainURL.IndexOf("&page=") != -1)
             {
-                CookieContainer cookies = new CookieContainer();
+                strMainURL = strMainURL.Substring(0, strMainURL.IndexOf("&page="));
+            }
 
-                if (strMainURL.IndexOf("&page=") != -1)
-                {
-                    strMainURL = strMainURL.Substring(0, strMainURL.IndexOf("&page="));
-                }
-                strMainURL = new UriBuilder(strMainURL).Uri.ToString();
+            if (strMainURL.IndexOf("playlist?list=") == -1)
+            {
+                myRequest = (HttpWebRequest)WebRequest.Create("http://gdata.youtube.com/feeds/api/users/" + strMainURL + "/playlists?&max-results=50");
+                myResponse = (HttpWebResponse)myRequest.GetResponse();
+                sr = new StreamReader(myResponse.GetResponseStream(), System.Text.Encoding.UTF8);
+                result = sr.ReadToEnd();
+                sr.Close();
+                myResponse.Close();
 
-                if (strMainURL != "")
+                //try
+                //{
+                //    myRequest = (HttpWebRequest)WebRequest.Create("http://gdata.youtube.com/feeds/api/users/" + strMainURL + "/favorites?&max-results=1");
+                //    myResponse = (HttpWebResponse)myRequest.GetResponse();
+                //    sr = new StreamReader(myResponse.GetResponseStream(), System.Text.Encoding.UTF8);
+                //    result += sr.ReadToEnd();
+                //    sr.Close();
+                //    myResponse.Close();
+                //}
+                //catch
+                //{
+                //}
+
+                do
                 {
-                    System.IO.StreamWriter file = new System.IO.StreamWriter(AppDomain.CurrentDomain.BaseDirectory.ToString() + "\\log.txt", false, Encoding.UTF8);
+                    blnResultOk = result.Contains("playlist?list=");
+
+                    string strResult = "";
+
                     do
                     {
-                        iCounter += 1;
+                        strResult = GetBlockContent(ref result, "playlist?list=", "\'", false);
 
-                        strSearchURL = strMainURL + "&page=" + iCounter.ToString();
-                        SetCtrlProp(txtUrl, "Text", strSearchURL);
-
-                        //int milliseconds = 2000;
-                        //Thread.Sleep(milliseconds);
-
-                        myRequest = (HttpWebRequest)WebRequest.Create(strSearchURL);
-                        myRequest.UserAgent = "Mozilla/6.0 (Windows NT 6.2; WOW64; rv:16.0.1) Gecko/20121011 Firefox/16.0.1";
-                        myRequest.Method = "GET";
-
-                        Cookie cookie = new Cookie("PREF", "f1=500000000");
-                        cookie.Domain = ".youtube.com";
-                        cookies.Add(cookie);
-
-                        myRequest.CookieContainer = cookies;
-                        myResponse = (HttpWebResponse)myRequest.GetResponse();
-                        sr = new StreamReader(myResponse.GetResponseStream(), System.Text.Encoding.UTF8);
-                        result = sr.ReadToEnd();
-                        resulttmp = result;
-                        sr.Close();
-                        myResponse.Close();
-
-                        file.WriteLine(resulttmp);
-
-                        if (iCounter == 1) strPlayListName = GetBlockContent(ref resulttmp, "<title>", "</title>");
-
-                        blnResultOk = result.Contains("<h3 class=\"video-title-container\">");
-                        do
+                        if (strResult != "")
                         {
-                            strListItem = GetBlockContent(ref result, "<li class=\"playlist-video-item", "</li>",true);
-                            if (chkSaveHtml.Checked)
+                            strResult = "http://www.youtube.com/playlist?list=" + strResult;
+
+                            ytPlaylists.Add(new YoutubePlaylist(new UriBuilder(strResult).Uri.ToString()));
+
+                        }
+                    } while (strResult != "");
+
+                } while (blnResultOk);
+
+            }
+            else
+            {
+                strMainURL = new UriBuilder(strMainURL).Uri.ToString();
+                ytPlaylists.Add(new YoutubePlaylist(strMainURL));
+            }
+
+            System.IO.StreamWriter file = new System.IO.StreamWriter(AppDomain.CurrentDomain.BaseDirectory.ToString() + "\\log.txt", false, Encoding.UTF8);
+
+            foreach (YoutubePlaylist ytPlaylist in ytPlaylists)
+            {
+                string strBlock = "";
+                string strListItem = "";
+                string strExtrasBlock = "";
+                string strVideoUrl = "";
+                string strTitle = "";
+                string strOwner = "";
+                string strViews = "";
+
+                string strResults = "";
+                string strLine = "";
+
+                string strSearchURL = "";
+
+                int iCounter = 0;
+                int iLineCounter = 0;
+
+                do
+                {
+                    iCounter += 1;
+
+                    strSearchURL = ytPlaylist.Url + "&page=" + iCounter.ToString();
+
+                    //int milliseconds = 2000;
+                    //Thread.Sleep(milliseconds);
+
+                    myRequest = (HttpWebRequest)WebRequest.Create(strSearchURL);
+                    myRequest.UserAgent = "Mozilla/6.0 (Windows NT 6.2; WOW64; rv:16.0.1) Gecko/20121011 Firefox/16.0.1";
+
+                    Cookie cookie = new Cookie("PREF", "f1=500000000");
+                    cookie.Domain = ".youtube.com";
+                    cookies.Add(cookie);
+
+                    myRequest.CookieContainer = cookies;
+                    myResponse = (HttpWebResponse)myRequest.GetResponse();
+                    sr = new StreamReader(myResponse.GetResponseStream(), System.Text.Encoding.UTF8);
+                    result = sr.ReadToEnd();
+                    resulttmp = result;
+                    sr.Close();
+                    myResponse.Close();
+
+                    file.WriteLine(resulttmp);
+
+                    if (iCounter == 1)
+                    {
+                        strPlayListName = GetBlockContent(ref resulttmp, "<title>", "</title>");
+                        ytPlaylist.Title = strPlayListName;
+                    }
+
+                    blnResultOk = result.Contains("<h3 class=\"video-title-container\">");
+                    do
+                    {
+                        strListItem = GetBlockContent(ref result, "<li class=\"playlist-video-item", "</li>", true);
+                        if (chkSaveHtml.Checked)
+                        {
+                            strListItem = strListItem.Replace("src=\"//", "src=\"http://");
+
+                            StrThumbUriSource = strListItem;
+                            StrThumbUriSource = GetBlockContent(ref StrThumbUriSource, "src=\"", "\"");
+
+                            if (StrThumbUriSource != "")
                             {
-                                strListItem = strListItem.Replace("src=\"//", "src=\"http://");
-
-                                StrThumbUriSource = strListItem;
-                                StrThumbUriSource = GetBlockContent(ref StrThumbUriSource, "src=\"", "\"");
-
-                                if (StrThumbUriSource != "")
+                                if (StrThumbUriSource.Substring(StrThumbUriSource.Length - 3, 3) != "gif")
                                 {
-                                    if (StrThumbUriSource.Substring(StrThumbUriSource.Length - 3, 3) != "gif")
+                                    strThumbImg = "data:image/png;base64," + ConvertImageURLToBase64(StrThumbUriSource);
+                                    strListItem = strListItem.Replace(StrThumbUriSource, strThumbImg);
+                                }
+                                else
+                                {
+                                    StrThumbUriThumb = strListItem;
+                                    StrThumbUriThumb = GetBlockContent(ref StrThumbUriThumb, "data-thumb=\"//", "\"");
+
+                                    if (StrThumbUriThumb != "")
                                     {
-                                        strThumbImg = "data:image/png;base64," + ConvertImageURLToBase64(StrThumbUriSource);
+                                        strThumbImg = "data:image/png;base64," + ConvertImageURLToBase64(StrThumbUriThumb);
                                         strListItem = strListItem.Replace(StrThumbUriSource, strThumbImg);
                                     }
-                                    else
-                                    {
-                                        StrThumbUriThumb = strListItem;
-                                        StrThumbUriThumb = GetBlockContent(ref StrThumbUriThumb, "data-thumb=\"//", "\"");
-
-                                        if (StrThumbUriThumb != "")
-                                        {
-                                            strThumbImg = "data:image/png;base64," + ConvertImageURLToBase64(StrThumbUriThumb);
-                                            strListItem = strListItem.Replace(StrThumbUriSource, strThumbImg);
-                                        }
-                                    }
                                 }
-
-                                strListItems.Append(strListItem);
                             }
 
-                            strBlock = GetBlockContent(ref strListItem, "<h3 class=\"video-title-container\">", "</div>");
+                            strListItems.Append(strListItem);
+                        }
 
-                            strExtrasBlock = strBlock;
+                        strBlock = GetBlockContent(ref strListItem, "<h3 class=\"video-title-container\">", "</div>");
 
-                            if (strExtrasBlock != "")
+                        strExtrasBlock = strBlock;
+
+                        if (strExtrasBlock != "")
+                        {
+                            strVideoUrl = "www.youtube.com/watch?v=" + GetBlockContent(ref strExtrasBlock, "watch?v=", "&amp");
+                            strTitle = WebUtility.HtmlDecode(GetBlockContent(ref strExtrasBlock, "dir=\"ltr\">", "</"));
+                            strOwner = WebUtility.HtmlDecode(GetBlockContent(ref strExtrasBlock, "dir=\"ltr\">", "</"));
+                            strViews = GetBlockContent(ref strExtrasBlock, "\"video-view-count\">", "</");
+                            strViews = strViews.Trim();
+                            strdummy = strViews;
+                            strViews = GetBlockContent(ref strdummy, "", " ");
+
+                            strLine = iLineCounter.ToString() + "\t" + strVideoUrl + "\t" + strOwner + "\t" + strViews + "\t" + strTitle;
+                            strResults += strLine + "\r\n";
+                            ytPlaylist.Data = strResults;
+
+                            iLineCounter += 1;
+
+                            m_oWorker.ReportProgress(0,new reportProgress("(" + strPlayListName + ") " + "Reading Page " + iCounter.ToString() + " (" + iLineCounter.ToString() + " Results.)",strSearchURL) );
+
+                            if (m_oWorker.CancellationPending)
                             {
-                                strVideoUrl = "www.youtube.com/watch?v=" + GetBlockContent(ref strExtrasBlock, "watch?v=", "&amp");
-                                strTitle = WebUtility.HtmlDecode(GetBlockContent(ref strExtrasBlock, "dir=\"ltr\">", "</"));
-                                strOwner = WebUtility.HtmlDecode(GetBlockContent(ref strExtrasBlock, "dir=\"ltr\">", "</"));
-                                strViews = GetBlockContent(ref strExtrasBlock, "\"video-view-count\">", "</");
-                                strViews = strViews.Trim();
-                                strdummy = strViews;
-                                strViews = GetBlockContent(ref strdummy, "", " ");
-
-                                strLine = iLineCounter.ToString() + "\t" + strVideoUrl + "\t" + strOwner + "\t" + strViews + "\t" + strTitle;
-                                strResults += strLine + "\r\n";
-
-                                iLineCounter += 1;
-                                SetCtrlPropCollection(sstrip, sstrip.Items[0], "Text", "Reading Page " + iCounter.ToString() + " (" + iLineCounter.ToString() + " Results.)");
+                                file.Close();
+                                //e.Cancel = true;
+                                e.Result = ytPlaylists;
+                                m_oWorker.ReportProgress(0,new reportProgress("(" + strPlayListName + ") " + "Cancelled.",strSearchURL));
+                                return;
                             }
+                        }
 
-                        } while (strBlock != "");
+                    } while (strBlock != "");
 
-                    } while (blnResultOk);
+                } while (blnResultOk);
 
-                    if (chkSaveHtml.Checked)
-                    {
-                        SavePlaylistAsHTML(strPlayListName,strListItems.ToString());
-                    }
-
-                    if (chkSaveFile.Checked)
-                    {
-                        SavePlaylistAsText(strPlayListName, strResults);
-                    }
-
-                    SetCtrlPropCollection(sstrip, sstrip.Items[0], "Text", "Completed " + iCounter.ToString() + " Pages (" + iLineCounter.ToString() + " Results.)");
-                    SetCtrlProp(txtResults, "Text", strResults);
-                    file.Close();
+                if (chkSaveHtml.Checked)
+                {
+                    SavePlaylistAsHTML(strPlayListName, strListItems.ToString());
                 }
 
-                SetCtrlProp(cmdRefresh, "Enabled", true);
-                SetCtrlProp(txtUrl, "Enabled", true);
-                SetCtrlProp(chkSaveHtml, "Enabled", true);
-                SetCtrlProp(chkSaveFile, "Enabled", true);
-                SetCtrlProp(txtResults, "Enabled", true);
+                if (chkSaveFile.Checked)
+                {
+                    SavePlaylistAsText(strPlayListName, strResults);
+                }
+
+                m_oWorker.ReportProgress(100, new reportProgress("(" + strPlayListName + ") " + "Completed " + iCounter.ToString() + " Pages (" + iLineCounter.ToString() + " Results.)", strSearchURL));
             }
-            catch (Exception exp)
-            {
-                SetCtrlProp(cmdRefresh, "Enabled", true);
-                SetCtrlProp(txtUrl, "Enabled", true);
-                SetCtrlProp(chkSaveHtml, "Enabled", true);
-                SetCtrlProp(chkSaveFile, "Enabled", true);
-                MessageBox.Show(exp.Message.ToString(), Application.ProductName);
-            }
+
+            e.Result = ytPlaylists;
+            file.Close();
         }
     }
 }
