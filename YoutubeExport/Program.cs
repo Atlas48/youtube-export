@@ -8,11 +8,25 @@ using System.Net;
 using System.IO;
 using System.Threading;
 using System.ComponentModel;
+using System.Runtime.InteropServices;
+using System.Web.Script.Serialization;
 
 namespace YoutubeExport
 {
+    internal class YoutubeJsonObject
+    {
+        public string load_more_widget_html { get; set; }
+        public string content_html { get; set; }
+    }
+
     static class Program
     {
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool AttachConsole(uint dwProcessId);
+
+        [DllImport("kernel32.dll", SetLastError = true, ExactSpelling = true)]
+        static extern bool FreeConsole();
+
         /// <summary>
         /// The main entry point for the application.
         /// </summary>
@@ -22,6 +36,7 @@ namespace YoutubeExport
 
             if (args.Length == 0)
             {
+                //FreeConsole();
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
                 Application.Run(new Mainfrm());
@@ -39,7 +54,14 @@ namespace YoutubeExport
 
                 strUrl=args[0];
 
+                //AttachConsole(0x0ffffffff);
+
                 support.DoExport(strUrl, null, saveTxt, saveHTML);
+
+                //SendKeys.SendWait("{ENTER}"); 
+                //FreeConsole();
+                //System.Environment.Exit(0);            
+            
             }            
             
         }
@@ -74,7 +96,8 @@ namespace YoutubeExport
     };
 
     public class Support
-    {            
+    {
+        
         public string RemoveScriptAndStyle(string HTML)
         {
             string Pat = "<(script|style)\\b[^>]*?>.*?</\\1>";
@@ -95,18 +118,32 @@ namespace YoutubeExport
 
                 System.IO.StreamWriter file = new System.IO.StreamWriter(strFilePath, false, Encoding.UTF8);
 
-                strHtlmDoc += "<title>" + fileName + "</title>";
+                strHtlmDoc += "<!DOCTYPE html>" + "\r\n";
 
-                strHtlmDoc = "<!DOCTYPE html><html lang=\"en\"" + "\r\n";
-                strHtlmDoc += "<ol itemscope itemtype=\"http://schema.org/VideoGallery\">";
+                strHtlmDoc += "<html lang=\"en\">" + "\r\n";
 
-                strHtlmDoc += "<link id=\"css-1011281340\" class=\"www-core\" rel=\"stylesheet\" href=\"http://s.ytimg.com/yts/cssbin/www-core-vflGQCv1D.css\" data-loaded=\"true\">" + "\r\n";
-                strHtlmDoc += "<link id=\"css-2085296452\" class=\"www-home-c4\" rel=\"stylesheet\" href=\"http://s.ytimg.com/yts/cssbin/www-home-c4-vflkkTB-i.css\" data-loaded=\"true\">" + "\r\n";
-                strHtlmDoc += "<link id=\"css-3129785590\" class=\"www-playlist-hh\" rel=\"stylesheet\" href=\"http://s.ytimg.com/yts/cssbin/www-playlist-hh-vflzM4alL.css\" data-loaded=\"true\">" + "\r\n";
+                strHtlmDoc += "<head>" + "\r\n";
+                strHtlmDoc += "<title>" + fileName + "</title>" + "\r\n";
+                strHtlmDoc += "<link href=\"http://s.ytimg.com/yts/cssbin/www-core-vflqJi9JP.css\" rel=\"stylesheet\">" + "\r\n";
+                strHtlmDoc += "<link href=\"http://s.ytimg.com/yts/cssbin/www-home-c4-vfljtKkXJ.css\" rel=\"stylesheet\">" + "\r\n";
+                strHtlmDoc += "</head>" + "\r\n";
+
+                strHtlmDoc += "<body>" + "\r\n";
+
+                strHtlmDoc += "<ul id=\"browse-items-primary\">" + "\r\n";
+                strHtlmDoc += "<li>" + "\r\n";
+
+                strHtlmDoc += "<div class=\"yt-uix-dragdrop pl-video-list-editable pl-video-list\" id=\"pl-video-list\">" + "\r\n";
+                strHtlmDoc += "<table class=\"pl-video-table\" id=\"pl-video-table\">" + "\r\n";
+                strHtlmDoc += "<tbody id=\"pl-load-more-destination\">" + "\r\n";
 
                 strHtlmDoc += ListItems + "\r\n";
 
-                strHtlmDoc += "</ol>" + "\r\n";
+                strHtlmDoc += "</tbody>" + "\r\n";
+                strHtlmDoc += "</table>" + "\r\n";
+                strHtlmDoc += "</li>" + "\r\n";
+                strHtlmDoc += "</ul>" + "\r\n";
+                strHtlmDoc += "</body>" + "\r\n";
                 strHtlmDoc += "</html>" + "\r\n";
 
                 strHtlmDoc = strHtlmDoc.Replace("\"//", "\"http://");
@@ -238,7 +275,6 @@ namespace YoutubeExport
 
             bool blnResultOk;
 
-            string strdummy = "";
             string strThumbImg = "";
             string StrThumbUriSource = "";
             string StrThumbUriThumb = "";
@@ -331,11 +367,11 @@ namespace YoutubeExport
                 int iCounter = 0;
                 int iLineCounter = 0;
 
+                strSearchURL = ytPlaylist.Url;
+
                 do
                 {
                     iCounter += 1;
-
-                    strSearchURL = ytPlaylist.Url + "&page=" + iCounter.ToString();
 
                     //int milliseconds = 2000;
                     //Thread.Sleep(milliseconds);
@@ -343,7 +379,7 @@ namespace YoutubeExport
                     myRequest = (HttpWebRequest)WebRequest.Create(strSearchURL);
                     myRequest.UserAgent = "Mozilla/6.0 (Windows NT 6.2; WOW64; rv:16.0.1) Gecko/20121011 Firefox/16.0.1";
 
-                    Cookie cookie = new Cookie("PREF", "f1=500000000");
+                    Cookie cookie = new Cookie("PREF", "f1=500000000&hl=en&gl=US");
                     cookie.Domain = ".youtube.com";
                     cookies.Add(cookie);
 
@@ -359,14 +395,23 @@ namespace YoutubeExport
 
                     if (iCounter == 1)
                     {
-                        strPlayListName = GetBlockContent(ref resulttmp, "<title>", "</title>");
+                        strPlayListName = GetBlockContent(ref resulttmp, "<h1 class=\"pl-header-title\">", "</h1>");
+                        strPlayListName = strPlayListName.Replace("\n", "").Trim();
                         ytPlaylist.Title = strPlayListName;
                     }
+                    else
+                    {
+                        JavaScriptSerializer oJsc = new JavaScriptSerializer();
+                        YoutubeJsonObject oJscParsed = oJsc.Deserialize <YoutubeJsonObject>(result);
 
-                    blnResultOk = result.Contains("<h3 class=\"video-title-container\">");
+                        result = oJscParsed.content_html;
+                        resulttmp = oJscParsed.load_more_widget_html;
+                    }
+
+                    blnResultOk = result.Contains("<tr class=\"pl-video yt-uix-tile");
                     do
                     {
-                        strListItem = GetBlockContent(ref result, "<li class=\"playlist-video-item", "</li>", true);
+                        strListItem = GetBlockContent(ref result, "<tr class=\"pl-video yt-uix-tile", "</tr>", true);
                         if (saveHTML)
                         {
                             strListItem = strListItem.Replace("src=\"//", "src=\"http://");
@@ -397,19 +442,16 @@ namespace YoutubeExport
                             strListItems.Append(strListItem);
                         }
 
-                        strBlock = GetBlockContent(ref strListItem, "<h3 class=\"video-title-container\">", "</div>");
+                        strBlock = strListItem; // GetBlockContent(ref strListItem, "<td class=\"pl-video-title\">", "</td>");
 
                         strExtrasBlock = strBlock;
 
                         if (strExtrasBlock != "")
                         {
-                            strVideoUrl = "www.youtube.com/watch?v=" + GetBlockContent(ref strExtrasBlock, "watch?v=", "&amp");
-                            strTitle = WebUtility.HtmlDecode(GetBlockContent(ref strExtrasBlock, "dir=\"ltr\">", "</"));
-                            strOwner = WebUtility.HtmlDecode(GetBlockContent(ref strExtrasBlock, "dir=\"ltr\">", "</"));
-                            strViews = GetBlockContent(ref strExtrasBlock, "\"video-view-count\">", "</");
-                            strViews = strViews.Trim();
-                            strdummy = strViews;
-                            strViews = GetBlockContent(ref strdummy, "", " ");
+                            strVideoUrl = "www.youtube.com/watch?v=" + GetBlockContent(ref strExtrasBlock, "dir=\"ltr\" href=\"/watch?v=", "&amp");
+                            strTitle = WebUtility.HtmlDecode(GetBlockContent(ref strExtrasBlock, ">\n", "\n")).Trim();
+                            strOwner = WebUtility.HtmlDecode(GetBlockContent(ref strExtrasBlock, "href=\"/user/", "\""));  
+                            strViews = GetBlockContent(ref strExtrasBlock, "timestamp\">", "</");
 
                             strLine = iLineCounter.ToString() + "\t" + strVideoUrl + "\t" + strOwner + "\t" + strViews + "\t" + strTitle;
                             strResults += strLine + "\r\n";
@@ -419,19 +461,29 @@ namespace YoutubeExport
 
                             if (m_oWorker != null)
                             {
-                                m_oWorker.ReportProgress(0, new reportProgress("(" + strPlayListName + ") " + "Reading Page " + iCounter.ToString() + " (" + iLineCounter.ToString() + " Results.)", strSearchURL));
+                                m_oWorker.ReportProgress(0, new reportProgress("(" + strPlayListName + ") " + "Reading Page " + iCounter.ToString() + " (" + iLineCounter.ToString() + " Results.)", ytPlaylist.Url));
 
                                 if (m_oWorker.CancellationPending)
                                 {
                                     file.Close();
                                     //e.Cancel = true;
-                                    if (m_oWorker != null) m_oWorker.ReportProgress(0, new reportProgress("(" + strPlayListName + ") " + "Cancelled.", strSearchURL));
+                                    if (m_oWorker != null) m_oWorker.ReportProgress(0, new reportProgress("(" + strPlayListName + ") " + "Cancelled.", ytPlaylist.Url));
                                     return ytPlaylists;
                                 }
                             }
                         }
 
                     } while (strBlock != "");
+
+                    strSearchURL = GetBlockContent(ref resulttmp, "data-uix-load-more-href=\"", "\"");
+
+                    if (!string.IsNullOrWhiteSpace(strSearchURL))
+                    {
+                        strSearchURL = "https://www.youtube.com" + strSearchURL;
+                        blnResultOk = true;
+                    }
+                    else
+                        blnResultOk = false;
 
                 } while (blnResultOk);
 
@@ -445,7 +497,7 @@ namespace YoutubeExport
                     SavePlaylistAsText(strPlayListName, strResults);
                 }
 
-                if (m_oWorker != null) m_oWorker.ReportProgress(100, new reportProgress("(" + strPlayListName + ") " + "Completed " + iCounter.ToString() + " Pages (" + iLineCounter.ToString() + " Results.)", strSearchURL));
+                if (m_oWorker != null) m_oWorker.ReportProgress(100, new reportProgress("(" + strPlayListName + ") " + "Completed " + iCounter.ToString() + " Pages (" + iLineCounter.ToString() + " Results.)", ytPlaylist.Url));
             }
 
             file.Close();
