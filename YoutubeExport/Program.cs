@@ -10,12 +10,18 @@ using System.Threading;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Web.Script.Serialization;
+using System.Runtime.Serialization.Json;
+using System.Runtime.Serialization;
+using System.Web;
 
 namespace YoutubeExport
 {
+    [DataContract]
     internal class YoutubeJsonObject
     {
+        [DataMember]
         public string load_more_widget_html { get; set; }
+        [DataMember]
         public string content_html { get; set; }
     }
 
@@ -299,7 +305,7 @@ namespace YoutubeExport
 
             if (strMainURL.IndexOf("playlist?list=") == -1)
             {
-                myRequest = (HttpWebRequest)WebRequest.Create("http://gdata.youtube.com/feeds/api/users/" + strMainURL + "/playlists?&max-results=50");
+                myRequest = (HttpWebRequest)WebRequest.Create("http://www.youtube.com/user/" + strMainURL + "/playlists?view=1");
                 myResponse = (HttpWebResponse)myRequest.GetResponse();
                 sr = new StreamReader(myResponse.GetResponseStream(), System.Text.Encoding.UTF8);
                 result = sr.ReadToEnd();
@@ -327,7 +333,7 @@ namespace YoutubeExport
 
                     do
                     {
-                        strResult = GetBlockContent(ref result, "playlist?list=", "\'", false);
+                        strResult = GetBlockContent(ref result, "playlist?list=", "\"", false);
 
                         if (strResult != "")
                         {
@@ -395,14 +401,25 @@ namespace YoutubeExport
 
                     if (iCounter == 1)
                     {
-                        strPlayListName = GetBlockContent(ref resulttmp, "<h1 class=\"pl-header-title\">", "</h1>");
+                        strPlayListName = GetBlockContent(ref resulttmp, "<h1 class=\"pl-header-title\" tabindex=\"0\">", "</h1>");
                         strPlayListName = strPlayListName.Replace("\n", "").Trim();
                         ytPlaylist.Title = strPlayListName;
                     }
                     else
                     {
-                        JavaScriptSerializer oJsc = new JavaScriptSerializer();
-                        YoutubeJsonObject oJscParsed = oJsc.Deserialize <YoutubeJsonObject>(result);
+
+                        result = HttpUtility.HtmlDecode(result);
+
+                        DataContractJsonSerializer ser = new DataContractJsonSerializer(typeof(YoutubeJsonObject));
+                        MemoryStream stream1 = new MemoryStream(Encoding.UTF8.GetBytes(result));
+
+                        //result=result.Replace("\\U", "\\u");
+                        stream1.Position = 0;
+
+                        //JavaScriptSerializer oJsc = new JavaScriptSerializer();
+                        //YoutubeJsonObject oJscParsed = oJsc.Deserialize <YoutubeJsonObject>(result);
+
+                        YoutubeJsonObject oJscParsed = (YoutubeJsonObject)ser.ReadObject(stream1) ;
 
                         result = oJscParsed.content_html;
                         resulttmp = oJscParsed.load_more_widget_html;
@@ -450,8 +467,9 @@ namespace YoutubeExport
                         {
                             strVideoUrl = "www.youtube.com/watch?v=" + GetBlockContent(ref strExtrasBlock, "dir=\"ltr\" href=\"/watch?v=", "&amp");
                             strTitle = WebUtility.HtmlDecode(GetBlockContent(ref strExtrasBlock, ">\n", "\n")).Trim();
-                            strOwner = WebUtility.HtmlDecode(GetBlockContent(ref strExtrasBlock, "href=\"/user/", "\""));  
-                            strViews = GetBlockContent(ref strExtrasBlock, "timestamp\">", "</");
+                            strOwner = WebUtility.HtmlDecode(GetBlockContent(ref strExtrasBlock, "\" >", "</a>"));
+                            strViews = GetBlockContent(ref strExtrasBlock, "timestamp\"><span title=\"", "<");
+                            strViews = strViews.Substring(strViews.IndexOf('>')+1);
 
                             strLine = iLineCounter.ToString() + "\t" + strVideoUrl + "\t" + strOwner + "\t" + strViews + "\t" + strTitle;
                             strResults += strLine + "\r\n";

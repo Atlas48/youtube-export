@@ -31,9 +31,8 @@ C:\Users\drotsos\Desktop\Youtube Export\code\YoutubeExport\obj\x86\Release\Youtu
 C:\Users\drotsos\Desktop\Youtube Export\code\YoutubeExport\obj\x86\Release\YoutubeExport.pdb
 C:\Users\drotsos\Desktop\Youtube Export\code\YoutubeExport\bin\Release\YoutubeExport.exe
 C:\Users\drotsos\Desktop\Youtube Export\code\YoutubeExport\bin\Release\YoutubeExport.pdb
-C:\Users\drotsos\Desktop\Youtube Export\code\YoutubeExport\obj\x86\Release\ResolveAssemblyReference.cache
 C:\Users\drotsos\Desktop\Youtube Export\code\YoutubeExport\obj\x86\Release\YoutubeExport.Mainfrm.resources
 C:\Users\drotsos\Desktop\Youtube Export\code\YoutubeExport\obj\x86\Release\YoutubeExport.Properties.Resources.resources
-C:\Users\drotsos\Desktop\Youtube Export\code\YoutubeExport\obj\x86\Release\GenerateResource.read.1.tlog
-C:\Users\drotsos\Desktop\Youtube Export\code\YoutubeExport\obj\x86\Release\GenerateResource.write.1.tlog
 C:\Users\drotsos\Desktop\Youtube Export\code\YoutubeExport\bin\Release\YoutubeExport.exe.config
+C:\Users\drotsos\Desktop\Youtube Export\code\YoutubeExport\obj\x86\Release\YoutubeExport.csprojResolveAssemblyReference.cache
+C:\Users\drotsos\Desktop\Youtube Export\code\YoutubeExport\obj\x86\Release\YoutubeExport.csproj.GenerateResource.Cache
