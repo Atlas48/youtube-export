@@ -52,13 +52,13 @@ namespace YoutubeExport
                 bool saveTxt;
                 bool saveHTML;
                 string strUrl;
-                
-                Support support=new Support();
+
+                Support support = new Support();
 
                 saveTxt = args.Contains("-t");
                 saveHTML = args.Contains("-h");
 
-                strUrl=args[0];
+                strUrl = args[0];
 
                 //AttachConsole(0x0ffffffff);
 
@@ -67,9 +67,9 @@ namespace YoutubeExport
                 //SendKeys.SendWait("{ENTER}"); 
                 //FreeConsole();
                 //System.Environment.Exit(0);            
-            
-            }            
-            
+
+            }
+
         }
     }
 
@@ -103,7 +103,7 @@ namespace YoutubeExport
 
     public class Support
     {
-        
+
         public string RemoveScriptAndStyle(string HTML)
         {
             string Pat = "<(script|style)\\b[^>]*?>.*?</\\1>";
@@ -124,37 +124,42 @@ namespace YoutubeExport
 
                 System.IO.StreamWriter file = new System.IO.StreamWriter(strFilePath, false, Encoding.UTF8);
 
-                strHtlmDoc += "<!DOCTYPE html>" + "\r\n";
+                file.WriteLine("<!DOCTYPE html>");
 
-                strHtlmDoc += "<html lang=\"en\">" + "\r\n";
+                file.WriteLine("<html lang=\"en\">");
 
-                strHtlmDoc += "<head>" + "\r\n";
-                strHtlmDoc += "<title>" + fileName + "</title>" + "\r\n";
-                strHtlmDoc += "<link href=\"http://s.ytimg.com/yts/cssbin/www-core-vflqJi9JP.css\" rel=\"stylesheet\">" + "\r\n";
-                strHtlmDoc += "<link href=\"http://s.ytimg.com/yts/cssbin/www-home-c4-vfljtKkXJ.css\" rel=\"stylesheet\">" + "\r\n";
-                strHtlmDoc += "</head>" + "\r\n";
+                file.WriteLine("<head>");
+                file.WriteLine("<title>" + fileName + "</title>");
+                file.WriteLine("<link href=\"http://s.ytimg.com/yts/cssbin/www-core-vflqJi9JP.css\" rel=\"stylesheet\">");
+                file.WriteLine("<link href=\"http://s.ytimg.com/yts/cssbin/www-home-c4-vfljtKkXJ.css\" rel=\"stylesheet\">");
+                file.WriteLine("</head>");
 
-                strHtlmDoc += "<body>" + "\r\n";
+                file.WriteLine("<body>");
 
-                strHtlmDoc += "<ul id=\"browse-items-primary\">" + "\r\n";
-                strHtlmDoc += "<li>" + "\r\n";
+                file.WriteLine("<ul id=\"browse-items-primary\">");
+                file.WriteLine("<li>");
 
-                strHtlmDoc += "<div class=\"yt-uix-dragdrop pl-video-list-editable pl-video-list\" id=\"pl-video-list\">" + "\r\n";
-                strHtlmDoc += "<table class=\"pl-video-table\" id=\"pl-video-table\">" + "\r\n";
-                strHtlmDoc += "<tbody id=\"pl-load-more-destination\">" + "\r\n";
+                file.WriteLine("<div class=\"yt-uix-dragdrop pl-video-list-editable pl-video-list\" id=\"pl-video-list\">");
+                file.WriteLine("<table class=\"pl-video-table\" id=\"pl-video-table\">");
+                file.WriteLine("<tbody id=\"pl-load-more-destination\">");
 
-                strHtlmDoc += ListItems + "\r\n";
 
-                strHtlmDoc += "</tbody>" + "\r\n";
-                strHtlmDoc += "</table>" + "\r\n";
-                strHtlmDoc += "</li>" + "\r\n";
-                strHtlmDoc += "</ul>" + "\r\n";
-                strHtlmDoc += "</body>" + "\r\n";
-                strHtlmDoc += "</html>" + "\r\n";
+                string[] lstItems = ListItems.Split(new string[] { "</tr>" }, StringSplitOptions.RemoveEmptyEntries);
 
-                strHtlmDoc = strHtlmDoc.Replace("\"//", "\"http://");
-                strHtlmDoc = strHtlmDoc.Replace("data-thumb=\"//", "data-thumb=\"http://");
-                strHtlmDoc = strHtlmDoc.Replace("\"/watch?", "\"http://www.youtube.com/watch?");
+                foreach (var item in lstItems)
+                {
+                    file.WriteLine(item.Replace("\"//", "\"http://")
+                    .Replace("data-thumb=\"//", "data-thumb=\"http://")
+                    .Replace("\"/watch?", "\"http://www.youtube.com/watch?"));
+                }
+
+
+                file.WriteLine("</tbody>");
+                file.WriteLine("</table>");
+                file.WriteLine("</li>");
+                file.WriteLine("</ul>");
+                file.WriteLine("</body>");
+                file.WriteLine("</html>");
 
                 file.WriteLine(strHtlmDoc);
                 file.Close();
@@ -250,7 +255,7 @@ namespace YoutubeExport
                 stream.Close();
                 response.Close();
             }
-            catch //(Exception exp)
+            catch // (Exception exp)
             {
                 buf = null;
             }
@@ -266,6 +271,8 @@ namespace YoutubeExport
             {
 
                 Byte[] _byte = this.GetImage(url);
+
+                if (_byte == null) return "";
 
                 _sb.Append(Convert.ToBase64String(_byte, 0, _byte.Length));
 
@@ -419,7 +426,7 @@ namespace YoutubeExport
                         //JavaScriptSerializer oJsc = new JavaScriptSerializer();
                         //YoutubeJsonObject oJscParsed = oJsc.Deserialize <YoutubeJsonObject>(result);
 
-                        YoutubeJsonObject oJscParsed = (YoutubeJsonObject)ser.ReadObject(stream1) ;
+                        YoutubeJsonObject oJscParsed = (YoutubeJsonObject)ser.ReadObject(stream1);
 
                         result = oJscParsed.content_html;
                         resulttmp = oJscParsed.load_more_widget_html;
@@ -438,22 +445,24 @@ namespace YoutubeExport
 
                             if (StrThumbUriSource != "")
                             {
-                                if (StrThumbUriSource.Substring(StrThumbUriSource.Length - 3, 3) != "gif")
+                                //    if (StrThumbUriSource.Substring(StrThumbUriSource.Length - 3, 3) != "gif")
+                                //    {
+                                //        strThumbImg = "data:image/png;base64," + ConvertImageURLToBase64(StrThumbUriSource);
+                                //        strListItem = strListItem.Replace(StrThumbUriSource, strThumbImg);
+                                //    }
+                                //    else
+                                //    {
+                                StrThumbUriThumb = strListItem;
+                                StrThumbUriThumb = GetBlockContent(ref StrThumbUriThumb, "data-thumb=\"", "\"");
+
+                                if (StrThumbUriThumb != "")
                                 {
-                                    strThumbImg = "data:image/png;base64," + ConvertImageURLToBase64(StrThumbUriSource);
+                                    if (StrThumbUriThumb.Substring(0, 2) == "//") StrThumbUriThumb = "http:" + StrThumbUriThumb;
+
+                                    strThumbImg = "data:image/png;base64," + ConvertImageURLToBase64(StrThumbUriThumb);
                                     strListItem = strListItem.Replace(StrThumbUriSource, strThumbImg);
                                 }
-                                else
-                                {
-                                    StrThumbUriThumb = strListItem;
-                                    StrThumbUriThumb = GetBlockContent(ref StrThumbUriThumb, "data-thumb=\"//", "\"");
-
-                                    if (StrThumbUriThumb != "")
-                                    {
-                                        strThumbImg = "data:image/png;base64," + ConvertImageURLToBase64(StrThumbUriThumb);
-                                        strListItem = strListItem.Replace(StrThumbUriSource, strThumbImg);
-                                    }
-                                }
+                                //    }
                             }
 
                             strListItems.Append(strListItem);
@@ -468,8 +477,8 @@ namespace YoutubeExport
                             strVideoUrl = "www.youtube.com/watch?v=" + GetBlockContent(ref strExtrasBlock, "dir=\"ltr\" href=\"/watch?v=", "&amp");
                             strTitle = WebUtility.HtmlDecode(GetBlockContent(ref strExtrasBlock, ">\n", "\n")).Trim();
                             strOwner = WebUtility.HtmlDecode(GetBlockContent(ref strExtrasBlock, "\" >", "</a>"));
-                            strViews = GetBlockContent(ref strExtrasBlock, "timestamp\"><span title=\"", "<");
-                            strViews = strViews.Substring(strViews.IndexOf('>')+1);
+                            strViews = GetBlockContent(ref strExtrasBlock, "timestamp\"><span aria-label=\"", "</span>");
+                            strViews = strViews.Substring(strViews.IndexOf('>') + 1);
 
                             strLine = iLineCounter.ToString() + "\t" + strVideoUrl + "\t" + strOwner + "\t" + strViews + "\t" + strTitle;
                             strResults += strLine + "\r\n";
